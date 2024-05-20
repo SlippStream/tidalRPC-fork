@@ -10,7 +10,7 @@
 
 **tidalRPC** is released under the **GNU General Public v3.0** License.
 
-This is my (SlippStream's) modification of [rxri's original program](https://github.com/rxri/tidalRPC)
+This is my (SlippStream's) modification of [rxri's original program](https://github.com/SlippStream/tidalRPC-slipp)
 
 ---
 
