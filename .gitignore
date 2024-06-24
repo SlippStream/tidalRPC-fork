@@ -1,6 +1,8 @@
 # Output folder(s)
 dist/
 app/
+build/
+bin/
 
 # Node
 node_modules
@@ -10,3 +12,7 @@ node_modules
 
 #vscode
 .vscode/
+
+.env
+
+*.dll

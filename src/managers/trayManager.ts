@@ -1,13 +1,12 @@
 import { Menu, Tray, app } from "electron";
 
-import Song from "@classes/song";
 import debug from "debug";
 import { join } from "path";
 import { logger } from "../config";
 import { platform } from "os";
-import { rpcClient } from "@managers/discordManager";
+import { clearActivity, restartClient, rpcClient, setActivity } from "@managers/discordManager";
 import { AlbumPrefs, ArtistPrefs, store } from "@util/config";
-import { trayManager } from "../";
+import { Album, Track, getArtistString } from "@classes/song";
 
 let trayIcon: string;
 
@@ -26,16 +25,20 @@ export default class TrayManager {
 	constructor() {
 		this.systray = new Tray(trayIcon);
 		this.logger = logger.extend("TrayManager");
+
+		app.on("will-quit", () => {
+			this.systray.destroy();
+		});
 	}
 
-	update(song?: Song) {
+	update(song?: Track, album?: Album) {
 		const menu = Menu.buildFromTemplate([
 			{
-				label: `TidalRPC ${app.getVersion()}`,
+				label: `WavesRPC ${app.getVersion()}`,
 				enabled: false
 			},
 			{
-				label: `Playing: ${song?.artist} - ${song?.title}`,
+				label: `Playing: ${getArtistString(song?.artists)} - ${song?.title}`,
 				enabled: false,
 				visible: song ? true : false
 			},
@@ -90,13 +93,13 @@ export default class TrayManager {
 								enabled: false
 							},
 							{
-								label: song ? `${song.album.name}` : `[ALBUM NAME]`,
+								label:  `${album?.title}` || `[ALBUM NAME]`,
 								type: "radio",
 								checked: store.get("albumPrefs") == AlbumPrefs.justName,
 								click: () => store.set("albumPrefs", AlbumPrefs.justName)
 							},
 							{
-								label: song ? `${song.album.name} (${song.album.year})` : `[ALBUM NAME] ([ALBUM YEAR])`,
+								label: `${album?.title} (${album?.releaseYear})` || `[ALBUM NAME] ([ALBUM YEAR])`,
 								type: "radio",
 								checked: store.get("albumPrefs") == AlbumPrefs.withYear,
 								click: () => store.set("albumPrefs", AlbumPrefs.withYear)
@@ -109,15 +112,15 @@ export default class TrayManager {
 								enabled: false
 							},
 							{
-								label: song ? `${song.title}` : `[SONG TITLE]`,
-								sublabel: song ? `${song.artist}` : `[SONG ARTIST]`,
+								label: `${song?.title}` || `[SONG TITLE]`,
+								sublabel: `${getArtistString(song?.artists)}` || `[SONG ARTIST]`,
 								type: "radio",
 								checked: store.get("artistPrefs") == ArtistPrefs.justName,
 								click: () => store.set("artistPrefs", ArtistPrefs.justName)
 							},
 							{
-								label: song ? `${song.title}` : `[SONG TITLE]`,
-								sublabel: song ? `by ${song.artist}` : `by [SONG ARTIST]`,
+								label: `${song?.title}` || `[SONG TITLE]`,
+								sublabel: `by ${getArtistString(song?.artists)}` || `by [SONG ARTIST]`,
 								type: "radio",
 								checked: store.get("artistPrefs") == ArtistPrefs.byName,
 								click: () => store.set("artistPrefs", ArtistPrefs.byName)
@@ -127,6 +130,10 @@ export default class TrayManager {
 				]
 			},
 			{
+				label: "Restart Discord Client",
+				click: () => { restartClient(); }
+			},
+			{
 				label: "Exit",
 				role: "quit"
 			}
@@ -134,5 +141,3 @@ export default class TrayManager {
 		this.systray.setContextMenu(menu);
 	}
 }
-
-app.on("will-quit", () => trayManager?.systray.destroy());

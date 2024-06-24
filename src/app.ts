@@ -7,6 +7,7 @@ import { autoUpdater } from "electron-updater";
 import { blue } from "chalk";
 import debug from "debug";
 import { logger } from "./config";
+import 'dotenv/config'
 
 export default class App {
 	private logger: debug.Debugger;
@@ -17,7 +18,7 @@ export default class App {
 	}
 
 	async start() {
-		debug.enable("tidalRPC:*");
+		debug.enable("WavesRPC:*");
 		this._consoleLog();
 		this._checkUpdates();
 		setTimeout(async () => await this._checkPerms(), 100);
@@ -25,7 +26,7 @@ export default class App {
 	}
 
 	private _consoleLog() {
-		console.log(`TidalRPC v${version()}`);
+		console.log(`${app.name} v${version()}`);
 		console.log(`App version: ${blue(`v${app.getVersion()}`)}`);
 	}
 
@@ -66,9 +67,9 @@ export default class App {
 		);
 
 		const dialogVar = await dialog.showMessageBoxSync({
-			title: "tidalRPC",
+			title: "WavesRPC",
 			message:
-				"TidalRPC doesn't have screen recording permissions. Please add TidalRPC to Screen Recording permissions in 'System Preferences' or 'System Settings'.",
+				"WavesRPC doesn't have screen recording permissions. Please add WavesRPC to Screen Recording permissions in 'System Preferences' or 'System Settings'.",
 			buttons: ["Close program"],
 			defaultId: 0,
 			type: "error"

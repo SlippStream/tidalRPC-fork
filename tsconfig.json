@@ -1,16 +1,17 @@
 {
 	"compilerOptions": {
-		"target": "es2021",
-		"module": "commonjs",
+		"target": "ESNext",
+		"module": "NodeNext",
 		"outDir": "./dist",
 		"rootDir": "./src",
-		"moduleResolution": "node",
+		"moduleResolution": "NodeNext",
 		"typeRoots": ["src/interfaces", "node_modules/@types"],
 		"baseUrl": "src",
 		"paths": {
 			"@classes/*": ["classes/*"],
 			"@managers/*": ["managers/*"],
-			"@util/*": ["util/*"]
+			"@util/*": ["util/*"],
+			"@interfaces/*": ["interfaces/*"]
 		},
 		"esModuleInterop": true,
 		"forceConsistentCasingInFileNames": true

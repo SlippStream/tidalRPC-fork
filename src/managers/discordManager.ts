@@ -1,111 +1,137 @@
-import { Client, Presence } from "discord-rpc";
-import { clientID, logger } from "../config";
-
-import Song from "@classes/song";
+import Discord from "discord-game";
+import { logger } from "../config";
 import { AlbumPrefs, ArtistPrefs, store } from "@util/config";
+import { getArtistString, getHighestResPicture } from "@classes/song";
+import { PlayingTrack } from "./tidalManager";
+import { env } from "process";
 
 export let rpcClient: DiscordClient;
 
+const blankActivity: Discord.Activity.Activity = {
+	assets: {},
+	timestamps: {},
+	secrets: {},
+	party: {}
+}
+
+const isDiscordRequired = true;
+
 class DiscordClient {
 	clientId: string;
-	private client: Client;
 	private ready = false;
 	private activityCleared = false;
-	actualPresence!: Presence;
+	private activity: Discord.Activity.Activity;
 	lastCall: number = Date.now() - 5000;
 
-	constructor(clientID: string) {
+	constructor() {
 		rpcClient = this;
-		this.clientId = clientID;
-		this.client = new Client({
-			transport: "ipc"
-		});
+		Discord.create(env.discordClientId, isDiscordRequired);
 
-		this.client.on("ready", () => {
-			this.ready = true;
-			this.setActivity();
-		});
+		console.log(`DiscordManager: info: Client Created. GameSDK version ${Discord.version}`)
 
-		this.client.on(
-			// @ts-ignore
-			"disconnected",
-			() => {
-				this.client.destroy();
-				rpcClient = this;
-			}
-		);
-
-		this.client
-			.login({ clientId: this.clientId })
-			.catch((err: any) => console.error(err));
+		Discord.Application
+       .getOAuth2Token()
+       .then(function(token) { console.log('Token is', token) });
+		
+		setInterval(() => {
+			Discord.runCallback();
+		}, 1000/60)
 	}
 
-	setActivity(data?: Presence) {
-		data = data ? data : this.actualPresence;
+	setActivity(data?: Discord.Activity.Activity) {
+		data = data ?? this.activity;
 		if (!this.ready) return;
 		if (this.activityCleared) this.activityCleared = false;
 
-		this.client.setActivity(data).catch(() => this.client.destroy());
+		Discord.Activity
+			.update(data)
+			.then((success) => {
+				if (success) {
+					this.activity = data;
+					console.log("SetActivity: info: Rich Presence updated");
+					return;
+				}
+				console.error(`SetActivity: error: Couldn't set discord rice presence!`);
+			})
+			.catch((e) => console.error(`SetActivity: error: ${e}`));
 	}
 
 	clearActivity() {
 		if (!this.ready || this.activityCleared) return;
 
-		this.client.clearActivity().catch(() => this.client.destroy());
+		Discord.Activity
+			.update(blankActivity)
+			.then((success)=> {
+				if (success) {
+					console.log("ClearActivity: info: Rich Presence cleared");
+					this.activity = blankActivity;
+					return;
+				}
+				console.error(`ClearActivity: error: failed to clear discord activity!`);
+			})
+			.catch((e) => console.error(`ClearActivity: error: ${e}`));
 		this.activityCleared = true;
 	}
 
 	destroyClient() {
 		if (!this.ready) return;
-
-		this.client.destroy();
+		this.clearActivity();
+		rpcClient = null;
 	}
 }
 
-export const setActivity = (data: Song) => {
-		if (!data?.startTime) return clearActivity();
+export const restartClient = () => {
+	rpcClient?.destroyClient();
+	rpcClient = new DiscordClient();
+}
 
-		const presenceData: Presence = {
-			largeImageKey: data.largeImage
-		};
+export const setActivity = (currTrack: PlayingTrack) => {
+		if (!currTrack?.startTime) return clearActivity();
 
-		if (data.album) {
+		const presenceData = blankActivity;
+
+		presenceData.assets.largeImage = getHighestResPicture(currTrack.album.imageCover).url
+
+
+		if (currTrack.album) {
 			switch (store.get("albumPrefs")) {
 				case AlbumPrefs.withYear:
-					presenceData.largeImageText = `${data.album.name} (${data.album.year})`;
+					presenceData.assets.largeText = `${currTrack.album.title} (${Date.parse(currTrack.album.releaseDate)})`;
 					break;
 				default:
 				case AlbumPrefs.justName:
-					presenceData.largeImageText = `${data.album.name}`;				
+					presenceData.assets.largeText = `${currTrack.album.title}`;				
 					break;
 				}
 		}
 
-		if (!data.duration) presenceData.startTimestamp = data.startTime;
-		else
-			presenceData.endTimestamp =
-				data.startTime + data.duration + data.pausedTime;
+		if (!currTrack.track.duration) presenceData.timestamps.startAt = new Date(currTrack.startTime);
+		else presenceData.timestamps.endAt =
+				new Date(currTrack.startTime + currTrack.track.duration + currTrack.pausedTime);
 
 		switch(store.get("artistPrefs")) {
 			case ArtistPrefs.byName:
-				presenceData.state = `by ${data.artist}`;
+				presenceData.state = `by ${getArtistString(currTrack.track.artists)}`;
 				break;
 			default:
 			case ArtistPrefs.justName:
-				presenceData.state = `${data.artist}`;
+				presenceData.state = `${getArtistString(currTrack.track.artists)}`;
 		}
-		presenceData.details = data.title;
+		presenceData.details = currTrack.track.title;
 
-		if (data.buttons && data.buttons.length !== 0 && store.get("showButtons"))
-			presenceData.buttons = data.buttons;
+		/** As of writing, Discord's gameSDK does not support custom buttons in rich presence.
+		 * 
+		 * 
+		if (currTrack.buttons && currTrack.buttons.length !== 0 && store.get("showButtons"))
+			presenceData.buttons = currTrack.buttons;
+		*/
 
-		if (data.duration && presenceData.startTimestamp)
-			delete presenceData.startTimestamp;
+		if (currTrack.track.duration && presenceData.timestamps.startAt) {
+			delete presenceData.timestamps.startAt;
+		}
 
 		if (!rpcClient) {
-			rpcClient = new DiscordClient(clientID);
-			rpcClient.actualPresence = presenceData;
-			return;
+			restartClient();
 		}
 
 		if (rpcClient && Date.now() - rpcClient.lastCall < 5000) return;

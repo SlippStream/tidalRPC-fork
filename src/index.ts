@@ -1,4 +1,4 @@
-import App from "./app";
+import App from "./app.js";
 import TrayManager from "@managers/trayManager";
 import { app } from "electron";
 import { destroyClient } from "@managers/discordManager";
@@ -10,7 +10,7 @@ export let trayManager: TrayManager;
 const singleInstanceLock = app.requestSingleInstanceLock();
 if (!singleInstanceLock) app.quit();
 
-app.setAppUserModelId("ririxidev.TidalRPC");
+app.setAppUserModelId("slippstream.WavesRPC");
 app.whenReady().then(async () => {
 	trayManager = new TrayManager();
 	trayManager.update();

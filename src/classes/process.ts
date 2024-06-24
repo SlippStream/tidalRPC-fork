@@ -1,4 +1,5 @@
 import { Window, windowManager } from "node-window-manager";
+import { TidalStatus } from "@interfaces/tidalStatus"
 
 export default class Process {
 	private titleRegex: RegExp;

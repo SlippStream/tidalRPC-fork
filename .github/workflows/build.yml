@@ -40,18 +40,18 @@ jobs:
       - name: Upload DMG (macOS x86_64)
         uses: actions/upload-artifact@v3
         with:
-          name: tidalRPC-${{ matrix.os }}
-          path: app/tidalRPC-mac-x64.dmg
+          name: WavesRPC-${{ matrix.os }}
+          path: app/WavesRPC-mac-x64.dmg
         if: matrix.os == 'macos-latest'
       - name: Upload DMG (macOS arm64)
         uses: actions/upload-artifact@v3
         with:
-          name: tidalRPC-${{ matrix.os }}
-          path: app/tidalRPC-mac-arm64.dmg
+          name: WavesRPC-${{ matrix.os }}
+          path: app/WavesRPC-mac-arm64.dmg
         if: matrix.os == 'macos-latest'
       - name: Upload Installer (Windows)
         uses: actions/upload-artifact@v3
         with:
-          name: tidalRPC-${{ matrix.os }}
-          path: app/tidalRPC-installer.exe
+          name: WavesRPC-${{ matrix.os }}
+          path: app/WavesRPC-installer.exe
         if: matrix.os == 'windows-latest'

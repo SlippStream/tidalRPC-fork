@@ -1,47 +1,46 @@
-import axios, { AxiosInstance, HeadersDefaults } from "axios";
+import axios, { AxiosInstance } from "axios";
+import { BrowserWindow, ipcMain } from "electron";
+import { TidalAlbum } from "./song";
 
+type AuthCredentials = { credentialsStorageKey, clientId, clientSecret };
 export default class TidalAPI {
 	private baseURL: string;
-	private webToken: string;
 	private axios: AxiosInstance;
 	private isResultPending: boolean;
 	constructor() {
-		this.baseURL = "https://api.tidal.com/v1";
-		this.webToken = "CzET4vdadNUFQ5JU";
-		this.axios = axios.create({
-			baseURL: this.baseURL,
-			headers: {
-				"x-tidal-token": this.webToken
-			}
-		});
-		this.isResultPending = false;
+		this.baseURL = "https://openapi.tidal.com";
+		this._initializeAxios().then(() => this.isResultPending = false);
 	}
 
-	async searchSong(query: string, limit = 50) {
+	async searchSong(query: string, limit = 20) {
 		if (this.isResultPending) return;
-		if (!query) return console.error("SearchSong: No query specified.");
+		if (!query) return console.error("SearchSong: error: No query specified.");
 
 		this.isResultPending = true;
 		try {
+			if (!this.axios) return console.error("SearchSong: error: Axios not initialized! retrying..."), 
+				await this._initializeAxios();
 			const res = await this.axios({
 				method: "GET",
-				url: "/search/tracks",
+				url: "/search",
 				params: {
 					query,
 					limit,
 					offset: 0,
-					countryCode: "US"
+					countryCode: "US",
+					type: "TRACKS"
 				},
 				timeout: 120000
 			});
 
-			if (res.data.items.length === 0) {
+			if (res.data.tracks.length === 0) {
 				this.isResultPending = false;
+				console.log(`SearchSong: warn: no tracks found for ${query}`);
 				return [];
 			}
 
 			this.isResultPending = false;
-			return res.data.items;
+			return res.data.tracks.map((track) => track.resource);
 		} catch (err) {
 			console.error(err);
 			this.isResultPending = false;
@@ -49,15 +48,15 @@ export default class TidalAPI {
 		}
 	}
 
-	async getAlbumById(id: number) {
-		if (!id) return console.error("getAlbumById: No query specified.");
+	async getAlbumsById(idsArr: number[]): Promise<TidalAlbum[]> {
+		if (!idsArr || idsArr.length === 0) return console.error("getAlbumsById: error: No query specified."), [];
 
 		try {
 			const res = await this.axios({
 				method: "GET",
-				url: `/albums/${id}`,
+				url: `/albums/byIds`,
 				params: {
-					offset: 0,
+					ids: idsArr.toString(),
 					countryCode: "US"
 				},
 				timeout: 15000
@@ -65,10 +64,46 @@ export default class TidalAPI {
 
 			if (res.status === 404) return [];
 
-			return res.data;
+			return res.data.data.map((album) => album.resource);
 		} catch (err) {
-			console.error(err);
+			console.error(`getAlbumsById: error: ${err}`);
 			return [];
 		}
+	}
+
+	private async _initializeAxios(): Promise<void> {
+		const oldthis = this;
+
+		await this._forkAuthProcess()
+		.then((token) => {
+			oldthis.axios = axios.create({
+				baseURL: oldthis.baseURL,
+				headers: {
+					"Authorization": `Bearer ${token}`,
+					"accept": "application/vnd.tidal.v1+json",
+					"Content-Type": "application/vnd.tidal.v1+json"
+				}
+			});
+		});
+	}
+
+	private async _forkAuthProcess(): Promise<any> {
+		console.log(`id: ${process.env.clientId}`)
+		const authChild = new BrowserWindow({
+			webPreferences: {
+				preload: `${__dirname}\\tidalAuthPreload.js`,
+				sandbox: false
+			},
+			show: false
+		});
+		authChild.loadFile(`assets/tidalAuth.html`);
+
+		const promise = new Promise((resolve, reject) => {
+			ipcMain.once('auth', (e, a) => {
+				a.token ? resolve(a.token) : reject();
+			});
+		});
+
+		return promise;
 	}
 }
